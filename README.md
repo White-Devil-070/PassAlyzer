@@ -13,7 +13,9 @@ This version does **not require internet access** and works entirely **offline**
 /PassAlyzer
 │
 ├── main.cpp # The main C++ source code
+
 ├── pwnedpasswords.txt # Local breach password list (plain text)
+
 └── README.md # This documentation file
 
 ---
