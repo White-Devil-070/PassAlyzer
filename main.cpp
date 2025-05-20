@@ -1,92 +1,28 @@
 // Password Strength and Pwned Password Checker (WinINet ANSI version)
 #include <bits/stdc++.h>
 #include <cctype>
-#include <openssl/sha.h>
-#include <windows.h>
-#include <wininet.h>
-#pragma comment(lib, "wininet.lib")
+
 
 using namespace std;
 
-// Helper to convert SHA1 hash to uppercase hex string
-string sha1Hex(const string &input) {
-    unsigned char hash[SHA_DIGEST_LENGTH];
-    SHA1(reinterpret_cast<const unsigned char *>(input.c_str()), input.size(), hash);
-
-    stringstream ss;
-    for (int i = 0; i < SHA_DIGEST_LENGTH; ++i) {
-        ss << uppercase << hex << setw(2) << setfill('0') << (int)hash[i];
-    }
-    return ss.str();
-}
-
-// Perform HTTPS GET using WinINet (ANSI version)
-string httpGET(const string &host, const string &path) {
-    HINTERNET hInternet = InternetOpenA("PwnedPasswordChecker", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
-    if (!hInternet) return "[InternetOpen failed]";
-
-    HINTERNET hConnect = InternetConnectA(hInternet, host.c_str(), INTERNET_DEFAULT_HTTPS_PORT,
-                                          NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
-    if (!hConnect) {
-        InternetCloseHandle(hInternet);
-        return "[InternetConnect failed]";
+string checkLocalPwnedPasswords(const string& password, const string& filename = "./pwnedpasswords.txt") {
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cerr << " Could not open local pwned password file: " << filename << endl;
+        return " Could not open local pwned password file: ";
     }
 
-    const char* acceptTypes[] = {"/", NULL};
-    HINTERNET hRequest = HttpOpenRequestA(hConnect, "GET", path.c_str(), NULL,
-                                          NULL, acceptTypes,
-                                          INTERNET_FLAG_SECURE | INTERNET_FLAG_RELOAD, 0);
-
-    if (!hRequest) {
-        InternetCloseHandle(hConnect);
-        InternetCloseHandle(hInternet);
-        return "[HttpOpenRequest failed]";
-    }
-
-    BOOL sent = HttpSendRequestA(hRequest, NULL, 0, NULL, 0);
-    if (!sent) {
-        InternetCloseHandle(hRequest);
-        InternetCloseHandle(hConnect);
-        InternetCloseHandle(hInternet);
-        return "[HttpSendRequest failed]";
-    }
-
-    string response;
-    char buffer[4096];
-    DWORD bytesRead;
-    while (InternetReadFile(hRequest, buffer, sizeof(buffer), &bytesRead) && bytesRead > 0) {
-        response.append(buffer, bytesRead);
-    }
-
-    InternetCloseHandle(hRequest);
-    InternetCloseHandle(hConnect);
-    InternetCloseHandle(hInternet);
-
-    return response;
-}
-
-// Check if password is found in HaveIBeenPwned API
-string checkPwnedPassword(const string &password) {
-    string sha1 = sha1Hex(password);
-    string prefix = sha1.substr(0, 5);
-    string suffix = sha1.substr(5);
-
-    string urlPath = "/range/" + prefix;
-    string response = httpGET("api.pwnedpasswords.com", urlPath);
-
-    if (response.rfind("[", 0) == 0) {
-        return "Could not check for breaches (Error: " + response + ")";
-    }
-
-    istringstream stream(response);
     string line;
-    while (getline(stream, line)) {
-        if (line.substr(0, suffix.size()) == suffix) {
-            return "WARNING: This password has been found in a data breach!";
+    while (getline(file, line)) {
+        if (line == password) {
+            return "WARNING: This password has been found in a local breach database!";
         }
     }
-    return "Password not found in known breaches.";
+
+    return " Good news: This password was not found in the local breach list.";
 }
+
+
 
 // Check character composition strength
 string CaseCheck(string str) {
@@ -151,11 +87,10 @@ int main() {
     string strength = StrengthChecker(str);
     cout << "Password Strength: " << strength << endl;
 
-    string breachResult = checkPwnedPassword(str);
+    string breachResult = checkLocalPwnedPasswords(str);
     cout << breachResult << endl;
 system("pause");
     return 0;
 }
-// compile with: g++ main.cpp -o PassAlyzer -lwininet -lssl -lcrypto
-// run with: PassAlyzer.exe
-// Note: This code uses WinINet for HTTPS requests, which is specific to Windows.
+// This code checks the strength of a password based on its character composition and length.
+// It also checks if the password has been found in a local breach database.
